@@ -3,4 +3,19 @@
 
 # Minecraft Mod Manager
 本项目的目标在于自动安装和卸载Minecraft的模组，以及自动配置依赖项。
-本项目当前刚刚起步，仅能实现命令行下的mod搜索和下载
+本项目当前刚刚起步。
+
+### 已实现功能：
+ - mod搜索
+ - mod下载
+ - mod依赖列表
+ - modpack搜索
+ - modpack下载
+ - modpack依赖列表
+
+### 待实现功能：
+ - 路径配置
+ - mod安装
+ - 游戏本体安装
+ - modpack安装
+ - 防止卡死
