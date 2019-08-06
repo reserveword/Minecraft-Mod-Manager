@@ -19,16 +19,16 @@ url_base = 'https://www.curseforge.com/minecraft'
 
 url_mods = url_base + '/mc-mods'
 url_searchmod = url_mods + '/search?search={key}'
-url_mod = url_mods + '/{modpid}'
+url_mod = url_mods + '/{itempid}'
 url_modfilelist = url_mod + '/files/all?page={page}'
-url_modfile = url_mod + '/download/{modfid}/file'
+url_modfile = url_mod + '/download/{itemfid}/file'
 url_moddep = url_mod + '/relations/dependencies?page={page}'
 
 url_packs = url_base + '/modpacks'
 url_searchpack = url_packs + '/search?search={key}'
-url_pack = url_packs + '/{packpid}'
+url_pack = url_packs + '/{itempid}'
 url_packfilelist = url_pack + '/files/all?page={page}'
-url_packfile = url_pack + '/download/{packfid}/file'
+url_packfile = url_pack + '/download/{itemfid}/file'
 url_packdep = url_pack + '/relations/dependencies?page={page}'
 
 tp = ThreadPoolExecutor(7)
@@ -73,7 +73,7 @@ def cliprogressbar(total, length=100):
                 print()
     return inner
 
-def mod_search(key, page=1):
+def mod_search(key, page=1, url_search=url_searchmod):
     """search in curseforge minecraft/mc-mods with keyword=key
 
     Note: parameter `page` is not used currently
@@ -81,43 +81,43 @@ def mod_search(key, page=1):
     Return Value:
 
         dict:projectId => name"""
-    modlist = {}
-    response = requests.get(url_searchmod.format(key=key, page=page)).text
+    itemlist = {}
+    response = requests.get(url_search.format(key=key, page=page)).text
     for a in html5lib.parse(response).findall(f'.//{w3}a'):
         title = a.find(f'./{w3}h3')
         if title != None:
-            modlist[urllastpiece(a.attrib['href'])] = title.text
-    return modlist
+            itemlist[urllastpiece(a.attrib['href'])] = title.text
+    return itemlist
 
-def mod_file_page(modpid, page=1):
+def mod_file_page(itempid, page=1, url_filelist=url_modfilelist):
     """given mod projectId from `mod_search`, search avalible files.
     
     Return Value:
 
         dict:fileId => (state, filename, size, updateTime, gameVersion)"""
     filelist = {}
-    response = requests.get(url_modfilelist.format(modpid=modpid, page=page)).text
+    response = requests.get(url_filelist.format(itempid=itempid, page=page)).text
     for tr in html5lib.parse(response).findall(f'.//{w3}tr'):
         row = tr.findall(f'./{w3}td')[:5]
         if not row:
             continue
         row[0] = row[0].find(f'./*/{w3}span').text.strip()
         tmp = row[1].find(f'./{w3}a')
-        modfid = urllastpiece(tmp.attrib['href'])
+        itemfid = urllastpiece(tmp.attrib['href'])
         row[1] = tmp.text.strip()
         row[2] = row[2].text.strip()
         row[3] = row[3].find(f'./{w3}abbr').attrib['data-epoch']
         row[4] = row[4].find(f'./{w3}div/{w3}div').text.strip()
-        filelist[modfid] = row
+        filelist[itemfid] = row
     return filelist
 
-def mod_file(modpid, modfid, savePath='', progressbar=True, overwrite=None):
+def mod_file(itempid, itemfid, savePath='', progressbar=True, overwrite=None, url_file=url_modfile):
     """download file with given mod projectId and fileId
     
     Note: Unless `progressbar` is disabled and `overwrite` is set, this method interacts with standard I/O
 
         overwrite: bool or function () => bool"""
-    response = requests.get(url_modfile.format(modpid=modpid,modfid=modfid), stream=True)
+    response = requests.get(url_file.format(itempid=itempid,itemfid=itemfid), stream=True)
     blocklength = 8192
     if progressbar:
         pbar = cliprogressbar(int(response.headers['Content-Length'].strip())/blocklength)
@@ -130,9 +130,9 @@ def mod_file(modpid, modfid, savePath='', progressbar=True, overwrite=None):
                     pbar()
     except FileExistsError as e:
         ow = None
-        if overwrite is bool:
+        if isinstance(overwrite, bool):
             ow = overwrite
-        elif overwrite is function:
+        elif callable(overwrite):
             ow = overwrite()
         if ow == None:      #it actually supports overwrite() returns None and use stdio for decision
             ow = input(f'File {filename} already exists. Overwrite?[y/N]').lower() in ('y', 'yes')
@@ -148,107 +148,41 @@ def mod_file(modpid, modfid, savePath='', progressbar=True, overwrite=None):
     if progressbar:
         pbar(end=True)
 
-def mod_dep_list(modpid):
-    modlist = {}
-    lastlist = None
-    for i in range(500):
-        sublist = mod_dep_page(modpid, i+1)
-        if sublist == lastlist:
-            return modlist
-        else:
-            modlist.update(sublist)
-    return modlist
-
-def mod_dep_page(modpid, page):
-    modlist = {}
-    response = requests.get(url_moddep.format(modpid=modpid, page=page)).text
-    for a in html5lib.parse(response).findall(f'.//{w3}a'):
-        title = a.find(f'./{w3}h3')
-        if title != None:
-            modlist[urllastpiece(a.attrib['href'])] = title.text
-    return modlist
-
-def pack_search(key, page=1):
-    packlist = {}
-    response = requests.get(url_searchpack.format(key=key, page=page)).text
-    for a in html5lib.parse(response).findall(f'.//{w3}a'):
-        title = a.find(f'./{w3}h3')
-        if title != None:
-            packlist[urllastpiece(a.attrib['href'])] = title.text
-    return packlist
-
-def pack_file_page(packpid, page=1):
-    filelist = {}
-    response = requests.get(url_packfilelist.format(packpid=packpid, page=page)).text
-    for tr in html5lib.parse(response).findall(f'.//{w3}tr'):
-        row = tr.findall(f'./{w3}td')[:5]
-        if not row:
-            continue
-        row[0] = row[0].find(f'./*/{w3}span').text.strip()
-        tmp = row[1].find(f'./{w3}a')
-        packfid = urllastpiece(tmp.attrib['href'])
-        row[1] = tmp.text.strip()
-        row[2] = row[2].text.strip()
-        row[3] = row[3].find(f'./{w3}abbr').attrib['data-epoch']
-        row[4] = row[4].find(f'./{w3}div/{w3}div').text.strip()
-        filelist[packfid] = row
-    return filelist
-
-def pack_file(packpid, packfid, savePath='', progressbar=True, overwrite=None):
-    response = requests.get(url_packfile.format(packpid=packpid,packfid=packfid), stream=True)
-    blocklength = 8192
-    if progressbar:
-        pbar = cliprogressbar(int(response.headers['Content-Length'].strip())/blocklength)
-    filename = savePath + urllastpiece(response.request.url)
-    try:
-        with open(filename,'xb') as fd:
-            for chunk in response.iter_content(blocklength):
-                fd.write(chunk)
-                if progressbar:
-                    pbar()
-    except FileExistsError as e:
-        ow = None
-        if overwrite is bool:
-            ow = overwrite
-        elif overwrite is function:
-            ow = overwrite()
-        if ow == None:      #it actually supports overwrite() returns None and use stdio for decision
-            ow = input(f'File {filename} already exists. Overwrite?[y/N]').lower() in ('y', 'yes')
-        if ow:
-            with open(filename,'wb') as fd:
-                for chunk in response.iter_content(blocklength):
-                    fd.write(chunk)
-                    if progressbar:
-                        pbar()
-        else:
-            response.close()
-            return
-    if progressbar:
-        pbar(end=True)
-
-def pack_dep_list(packpid):
-    packlist = {}
+def mod_dep_list(itempid, url_dep=url_moddep):
+    itemlist = {}
     pagenum = 1
-    response = requests.get(url_packdep.format(packpid=packpid, page=1)).text
+    response = requests.get(url_dep.format(itempid=itempid, page=1)).text
     for a in html5lib.parse(response).findall(f'.//{w3}a'):
         title = a.find(f'./{w3}h3')
         if title != None:
-            packlist[urllastpiece(a.attrib['href'])] = title.text
+            itemlist[urllastpiece(a.attrib['href'])] = title.text
         if a.attrib.__contains__('class') and a.attrib['class'].find('pagination-item') != -1:
             newpage = a.find(f'{w3}span')
             if (newpage != None) and isinstance(newpage.text,str):
                 newpage = newpage.text
                 if newpage.isdecimal():
                     pagenum = max(int(newpage),pagenum)
-    for sublist in tp.map(pack_dep_page,(packpid,)*(pagenum-1),range(2,pagenum+1)):
-        packlist.update(sublist)
-    return packlist
+    for sublist in tp.map(mod_dep_page,(itempid,)*(pagenum-1),range(2,pagenum+1),(url_dep,)*(pagenum-1)):
+        itemlist.update(sublist)
+    return itemlist
 
-def pack_dep_page(packpid, page):
-    packlist = {}
-    response = requests.get(url_packdep.format(packpid=packpid, page=page)).text
+def mod_dep_page(itempid, page, url_dep=url_moddep):
+    itemlist = {}
+    response = requests.get(url_dep.format(itempid=itempid, page=page)).text
     for a in html5lib.parse(response).findall(f'.//{w3}a'):
         title = a.find(f'./{w3}h3')
         if title != None:
-            packlist[urllastpiece(a.attrib['href'])] = title.text
-    return packlist
+            itemlist[urllastpiece(a.attrib['href'])] = title.text
+    return itemlist
+
+def pack_search(key, page=1):
+    return mod_search(key, page, url_searchpack)
+
+def pack_file_page(packpid, page=1):
+    return mod_file_page(packpid, page, url_packfilelist)
+
+def pack_file(packpid, packfid, savePath='', progressbar=True, overwrite=None):
+    return mod_file(packpid,packfid,savePath,progressbar,overwrite,url_packfile)
+
+def pack_dep_list(packpid):
+    return mod_dep_list(packpid,url_packdep)
