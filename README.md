@@ -12,10 +12,10 @@
  - modpack搜索
  - modpack下载
  - modpack依赖列表
+ - mod安装
 
 ### 待实现功能：
  - 路径配置
- - mod安装
  - 游戏本体安装
  - modpack安装
  - 防止卡死

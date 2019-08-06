@@ -12,10 +12,10 @@ This mod has just started developing.
  - modpack searching
  - modpack downloading
  - fetching modpack dependency list
+ - install mods
 
 ### Planned Features
  - configure game path
- - install mods
  - install game
  - install modpack
  - avoid 'not responding'
